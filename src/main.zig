@@ -1,47 +1,19 @@
 const std = @import("std");
-const Chunk = @import("Chunk.zig");
-const OpCode = Chunk.OpCode;
-const debug = @import("debug.zig");
-const Value = @import("value.zig").Value;
-const Vm = @import("Vm.zig");
+const zox = @import("zox.zig");
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+    zox.init();
+    defer zox.deinit();
 
-    defer {
-        if (gpa.deinit() != .ok) {
-            _ = gpa.detectLeaks();
-        }
+    const args = try std.process.argsAlloc(zox.allocator);
+    defer std.process.argsFree(zox.allocator, args);
+
+    if (args.len == 1) {
+        return zox.repl();
+    } else if (args.len == 2) {
+        return zox.file(args[1]);
+    } else {
+        std.debug.print("Usage: zox [path]\n", .{});
+        std.process.exit(64);
     }
-
-    var vm = Vm.init();
-    vm.debug_trace_execution = true;
-    defer vm.deinit();
-
-    var chunk = Chunk.init(allocator);
-    defer chunk.deinit();
-
-    chunk.writeConstant(
-        Value{ .number = 1.2 },
-        123,
-    );
-
-    chunk.writeConstant(
-        .{ .number = 3.4 },
-        123,
-    );
-
-    chunk.writeOpCode(.add, 123);
-
-    chunk.writeConstant(
-        .{ .number = 5.6 },
-        123,
-    );
-
-    chunk.writeOpCode(OpCode.div, 123);
-    chunk.writeOpCode(OpCode.negate, 123);
-    chunk.writeOpCode(OpCode.ret, 123);
-
-    try vm.interpret(&chunk);
 }

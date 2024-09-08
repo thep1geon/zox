@@ -1,18 +1,12 @@
 const std = @import("std");
+const zox = @import("zox.zig");
 const Chunk = @import("Chunk.zig");
 const OpCode = Chunk.OpCode;
 const Value = @import("value.zig").Value;
 const debug = @import("debug.zig");
+const compiler = @import("compiler.zig");
 
 const Vm = @This();
-
-pub const InterpretError = error{
-    Compile,
-
-    Runtime,
-    StackOverflow,
-    StackUnderflow,
-};
 
 const STACK_CAP = 256;
 
@@ -31,7 +25,7 @@ pub fn deinit(vm: *Vm) void {
 }
 
 pub fn push(vm: *Vm, value: Value) !void {
-    if (vm.sp + 1 == STACK_CAP) return InterpretError.StackOverflow;
+    if (vm.sp + 1 == STACK_CAP) return zox.ZoxError.StackOverflow;
 
     vm.stack[vm.sp] = value;
     vm.sp += 1;
@@ -39,7 +33,7 @@ pub fn push(vm: *Vm, value: Value) !void {
 }
 
 pub fn pop(vm: *Vm) !Value {
-    if (vm.sp == 0) return InterpretError.StackUnderflow;
+    if (vm.sp == 0) return zox.ZoxError.StackUnderflow;
 
     const value = vm.stack[vm.sp - 1];
     vm.sp -= 1;
@@ -57,7 +51,7 @@ fn readConstant(vm: *Vm) Value {
     return vm.chunk.constants.items[byte];
 }
 
-fn run(vm: *Vm) InterpretError!void {
+fn run(vm: *Vm) zox.ZoxError!void {
     while (vm.ip < vm.chunk.code.items.len) {
         if (vm.debug_trace_execution) {
             if (vm.sp != 0) {
@@ -120,15 +114,19 @@ fn run(vm: *Vm) InterpretError!void {
 
                 else => {
                     std.debug.print("{any}", .{inst});
-                    return InterpretError.Compile;
+                    return zox.ZoxError.Compile;
                 },
             }
         }
     }
 }
 
-pub fn interpret(vm: *Vm, chunk: *const Chunk) InterpretError!void {
-    vm.chunk = chunk;
+pub fn interpret(vm: *Vm, src: []const u8) zox.ZoxError!void {
+    var chunk = try compiler.compile(src);
+    defer chunk.deinit();
+
+    vm.chunk = &chunk;
     vm.ip = 0;
+
     return vm.run();
 }
